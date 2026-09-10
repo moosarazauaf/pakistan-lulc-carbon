@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+service_account.json
+cache/*.tmp
+cache/*.log
+.streamlit/secrets.toml
+cache_gaul_archive/
+
+# Local editor/agent config
+.claude/
+
+# Stray zero-byte files from shell redirection accidents
+/[0-9]*
+/*[[]*

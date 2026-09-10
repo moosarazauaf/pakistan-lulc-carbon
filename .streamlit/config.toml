@@ -1,0 +1,9 @@
+# Deployment-safe config. The dev server port lives in .claude/launch.json
+# instead, because pinning server.port here fights Streamlit Community Cloud,
+# which assigns its own port.
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"
+primaryColor = "#1d7a3e"
