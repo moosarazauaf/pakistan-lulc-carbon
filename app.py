@@ -41,14 +41,22 @@ st.markdown(CSS, unsafe_allow_html=True)
 
 
 @st.cache_resource(show_spinner=False)
-def earth_engine_ready() -> bool:
+def earth_engine_status() -> tuple[bool, str]:
+    """Return (ready, reason). The reason has to come back as a value.
+
+    An earlier version stashed the failure in st.session_state from inside this
+    cached function. That loses it: the cache means the body runs once for the
+    whole server, while session_state is per visitor, so every later session saw
+    an empty reason and the banner said only that Earth Engine was unavailable.
+    A deployment failing for a missing secret and one failing for a rejected key
+    looked identical, which is useless when the logs are not to hand.
+    """
     try:
         import gee
         gee.init()
-        return True
+        return True, ""
     except Exception as e:  # noqa: BLE001
-        st.session_state["_ee_error"] = str(e)[:300]
-        return False
+        return False, f"{type(e).__name__}: {str(e)[:400]}"
 
 
 def method_tab() -> None:
@@ -289,13 +297,24 @@ def main() -> None:
             f"accounted at 30 m · GLC-FCS30D"
         )
 
-    ee_ok = earth_engine_ready()
+    ee_ok, ee_reason = earth_engine_status()
     if not ee_ok:
         st.info(
             "Running from cache only — Earth Engine is unavailable, so the map "
-            "tab is disabled. Every other figure is unaffected. "
-            + st.session_state.get("_ee_error", "")
+            "tab is disabled. Every other figure is unaffected."
         )
+        with st.expander("Why is Earth Engine unavailable?"):
+            st.code(ee_reason or "no reason captured", language="text")
+            st.markdown(
+                "**No credentials found** means the `GEE_SERVICE_ACCOUNT` secret "
+                "is missing or is not valid JSON. On Streamlit Community Cloud "
+                "set it under *Settings → Secrets* as a triple-quoted TOML "
+                "string holding the whole service-account file.\n\n"
+                "**An `EEException` or a permission error** means the secret "
+                "arrived but Earth Engine rejected it: the service account is "
+                "not registered for Earth Engine, or its Cloud project does not "
+                "have the Earth Engine API enabled."
+            )
 
     tabs = st.tabs(["Map", "Change and carbon", "Full record",
                     "Show the arithmetic", "Districts", "Method and limits"])
