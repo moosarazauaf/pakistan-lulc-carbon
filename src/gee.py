@@ -17,6 +17,7 @@ unbiased while individual small features are missed.
 """
 from __future__ import annotations
 
+import base64
 import json
 import os
 from collections.abc import Mapping
@@ -68,8 +69,11 @@ def _shape_hint(text: str, err: Exception) -> str:
     return (
         f"GEE_SERVICE_ACCOUNT was found but could not be parsed: {shape}. "
         f"(length {n} characters; {type(err).__name__}: {err}). "
-        "Expected form on Streamlit Community Cloud, under Settings then "
-        "Secrets:\n\nGEE_SERVICE_ACCOUNT = '''\n{ ...whole service_account.json... }\n'''"
+        "Two forms are accepted on Streamlit Community Cloud, under Settings "
+        "then Secrets. Multi-line, where the value must start with a brace:\n\n"
+        "GEE_SERVICE_ACCOUNT = '''\n{ ...whole service_account.json... }\n'''\n\n"
+        "Or single-line base64, which has no quoting or newline hazards:\n\n"
+        "GEE_SERVICE_ACCOUNT = \"eyJ0eXBlIjogInNlcnZpY2VfYWNjb3VudCIsIC4uLg==\""
     )
 
 
@@ -111,7 +115,18 @@ def init() -> None:
             try:
                 info = json.loads(text)
             except json.JSONDecodeError as e:
-                raise RuntimeError(_shape_hint(text, e)) from None
+                # Fall back to base64. Pasting multi-line JSON into a hosting
+                # secrets box is easy to get wrong: the triple quotes can be
+                # saved empty, the editor can eat the newlines inside
+                # private_key, or the key name can end up inside the value. A
+                # single-line base64 blob has none of those failure modes, so
+                # GEE_SERVICE_ACCOUNT accepts either form.
+                try:
+                    decoded = base64.b64decode(text, validate=True).decode("utf-8")
+                    info = json.loads(decoded)
+                    text = decoded
+                except Exception:  # noqa: BLE001
+                    raise RuntimeError(_shape_hint(text, e)) from None
             key_data = text
     else:
         path = ROOT / "service_account.json"

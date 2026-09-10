@@ -32,16 +32,38 @@ is unavailable until you complete step 4.
 The service-account key is a private credential, so it is gitignored and never
 committed. Add it through Streamlit's own secrets interface:
 
-**App menu → Settings → Secrets**, then paste:
+**App menu → Settings → Secrets**. Either form works.
+
+**Single-line base64 (recommended).** No quoting or newline hazards, so it
+cannot be mangled by the secrets editor. Generate it and copy it to the
+clipboard without it ever appearing on screen:
+
+```bash
+.venv/Scripts/python.exe -c "import base64,pathlib;print(base64.b64encode(pathlib.Path('service_account.json').read_bytes()).decode())" | clip
+```
+
+Then paste as the value:
+
+```toml
+GEE_SERVICE_ACCOUNT = "eyJ0eXBlIjogInNlcnZpY2VfYWNjb3VudCIsIC4uLg=="
+```
+
+**Multi-line JSON.** The triple quotes preserve the JSON's own quotes and the
+newlines inside `private_key`:
 
 ```toml
 GEE_SERVICE_ACCOUNT = '''
-<paste the entire contents of service_account.json here>
+{ ...entire contents of service_account.json... }
 '''
 ```
 
-Use the triple-quoted form so the JSON's own quotes and newlines survive intact.
-Save, and the app restarts with the Map tab live.
+The value between the triple quotes must start with `{` and end with `}`. The
+common failures are saving the block with nothing between the quotes, and
+pasting the key name a second time inside the value.
+
+Save, and the app restarts with the Map tab live. If it does not, open the
+**"Why is Earth Engine unavailable?"** expander on the app: it names which of
+those shapes the secret matched, without printing any of it.
 
 `src/gee.py` reads this from `st.secrets` first and falls back to the
 `GEE_SERVICE_ACCOUNT` environment variable, so the same repo also runs on
