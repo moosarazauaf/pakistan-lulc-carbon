@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Mapping
 from pathlib import Path
 
 import ee
@@ -34,6 +35,42 @@ ACCOUNTING_SCALE_M = 300
 NATIVE_SCALE_M = 30
 
 _INITIALISED = False
+
+
+def _shape_hint(text: str, err: Exception) -> str:
+    """Describe how a malformed credential secret is wrong, without echoing it.
+
+    The secret is a private key, so nothing from it is ever printed. This
+    reports only structural facts - length, and which of a few known-wrong
+    shapes it matches - which is enough to tell a mispasted secret from a
+    rejected one without putting key material on screen.
+    """
+    n = len(text)
+    if not text:
+        shape = "it is empty"
+    elif text.startswith("{"):
+        shape = ("it starts with '{' so it looks like JSON, but is truncated or "
+                 "has had its quotes mangled. Check the whole file was pasted, "
+                 "from the opening brace to the closing one")
+    elif "-----BEGIN" in text[:80]:
+        shape = ("it is the private key on its own. The secret needs the whole "
+                 "service-account JSON file, not just the private_key value")
+    elif "=" in text.split("\n", 1)[0] and not text.startswith("{"):
+        shape = ("it looks like TOML rather than JSON, so the key name was "
+                 "probably pasted inside the value as well. The value between "
+                 "the triple quotes should start with '{'")
+    elif text.lower().endswith(".json") or "\\" in text[:120] or "/" in text[:120]:
+        shape = ("it looks like a file path. The secret must hold the file's "
+                 "contents, not its location")
+    else:
+        shape = "it is not JSON and does not match a known mistake"
+
+    return (
+        f"GEE_SERVICE_ACCOUNT was found but could not be parsed: {shape}. "
+        f"(length {n} characters; {type(err).__name__}: {err}). "
+        "Expected form on Streamlit Community Cloud, under Settings then "
+        "Secrets:\n\nGEE_SERVICE_ACCOUNT = '''\n{ ...whole service_account.json... }\n'''"
+    )
 
 
 def init() -> None:
@@ -62,12 +99,20 @@ def init() -> None:
             raw = None
 
     if raw:
-        if isinstance(raw, dict):  # secrets.toml can hold it as a table
-            info = dict(raw)
+        # A TOML table arrives as a Mapping, not a dict: Streamlit wraps
+        # sections in its own AttrDict, which is a Mapping but not a dict
+        # subclass, so an isinstance(raw, dict) test misses it and the value
+        # falls through to json.loads.
+        if isinstance(raw, Mapping):
+            info = {k: v for k, v in raw.items()}
             key_data = json.dumps(info)
         else:
-            info = json.loads(raw)
-            key_data = raw
+            text = str(raw).strip()
+            try:
+                info = json.loads(text)
+            except json.JSONDecodeError as e:
+                raise RuntimeError(_shape_hint(text, e)) from None
+            key_data = text
     else:
         path = ROOT / "service_account.json"
         if not path.exists():
