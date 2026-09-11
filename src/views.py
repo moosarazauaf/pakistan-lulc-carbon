@@ -235,7 +235,7 @@ def render_change(region: str, y0: int, y1: int) -> None:
     agg_t = A.agg_transitions(region, y0, y1)
     changed = sum(ha for (f, t), ha in agg_t.items() if f != t)
     total = sum(agg_t.values()) or 1.0
-    st.plotly_chart(charts.sankey(agg_t, y0, y1), use_container_width=True)
+    st.plotly_chart(charts.sankey(agg_t, y0, y1), width="stretch")
     st.caption(
         f"{changed / 100:,.0f} km² changed class between {y0} and {y1}, which is "
         f"{100 * changed / total:.1f}% of {region}. The other "
@@ -243,7 +243,7 @@ def render_change(region: str, y0: int, y1: int) -> None:
         "the diagram, because at this scale it would be one band wide enough to "
         "hide every conversion beside it."
     )
-    st.plotly_chart(charts.flux_waterfall(fs["rows"]), use_container_width=True)
+    st.plotly_chart(charts.flux_waterfall(fs["rows"]), width="stretch")
 
 
 # ================================================================ trajectory tab
@@ -256,17 +256,17 @@ def render_trajectory(region: str) -> None:
     present = [g for g in C.GROUPS
                if any(groups_series[y].get(g, 0) > 0 for y in C.ACTUAL_YEARS)]
     st.plotly_chart(charts.area_trajectory(groups_series, present),
-                    use_container_width=True)
+                    width="stretch")
 
     c1, c2 = st.columns(2)
     with c1:
-        st.plotly_chart(charts.agg_bars(agg_series), use_container_width=True)
+        st.plotly_chart(charts.agg_bars(agg_series), width="stretch")
     with c2:
         st.plotly_chart(charts.carbon_trajectory(carbon_series),
-                        use_container_width=True)
+                        width="stretch")
 
     st.plotly_chart(charts.pool_bars(A.stock_by_pool(region, C.ACTUAL_YEARS[-1])),
-                    use_container_width=True)
+                    width="stretch")
 
     rows = []
     for y in C.ACTUAL_YEARS:
@@ -286,7 +286,7 @@ def render_trajectory(region: str) -> None:
             "Carbon high Tg C": s[2] / TG,
         })
     st.dataframe(pd.DataFrame(rows).set_index("Epoch").round(2),
-                 use_container_width=True)
+                 width="stretch")
 
 
 # =============================================================== arithmetic tab
@@ -344,7 +344,7 @@ def render_arithmetic(region: str, y0: int, y1: int) -> None:
             "Total low": t[0], "Total best": t[1], "Total high": t[2],
         })
     st.dataframe(pd.DataFrame(dens).set_index("Code").round(1),
-                 use_container_width=True, height=320)
+                 width="stretch", height=320)
     st.caption("Mg C per hectare. Classes ordered by how much of the region they cover.")
 
     st.error(
@@ -435,7 +435,7 @@ def render_arithmetic(region: str, y0: int, y1: int) -> None:
             "Best Tg C": r["best_Mg_C"] / TG,
             "High Tg C": r["high_Mg_C"] / TG,
         } for r in fs["rows"]])
-        st.dataframe(df.round(3), use_container_width=True, height=420)
+        st.dataframe(df.round(3), width="stretch", height=420)
         st.download_button("Download as CSV", df.to_csv(index=False),
                            f"flux_{region}_{y0}_{y1}.csv", "text/csv")
 
@@ -448,7 +448,7 @@ def render_districts(y0: int, y1: int) -> None:
         st.warning("No district rows in the cache yet.")
         return
 
-    st.plotly_chart(charts.district_scatter(rows), use_container_width=True)
+    st.plotly_chart(charts.district_scatter(rows), width="stretch")
 
     df = pd.DataFrame([{
         "District": r["district"], "Province": r["province"],
@@ -467,15 +467,15 @@ def render_districts(y0: int, y1: int) -> None:
         st.markdown("**Largest built-up expansion**")
         st.dataframe(df.nlargest(10, "Built-up gain km²")
                      [["District", "Province", "Built-up gain km²", "Net carbon Tg C"]],
-                     use_container_width=True, hide_index=True)
+                     width="stretch", hide_index=True)
     with c2:
         st.markdown("**Largest carbon loss**")
         st.dataframe(df.nsmallest(10, "Net carbon Tg C")
                      [["District", "Province", "Net carbon Tg C", "Built-up gain km²"]],
-                     use_container_width=True, hide_index=True)
+                     width="stretch", hide_index=True)
 
     st.markdown("**Every district**")
-    st.dataframe(df.sort_values("Net carbon Tg C"), use_container_width=True,
+    st.dataframe(df.sort_values("Net carbon Tg C"), width="stretch",
                  height=420, hide_index=True)
     st.download_button("Download district table as CSV", df.to_csv(index=False),
                        f"districts_{y0}_{y1}.csv", "text/csv")
