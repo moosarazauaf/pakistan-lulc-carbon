@@ -165,11 +165,18 @@ def sankey(agg_trans: dict[tuple[int, int], float], year_from: int,
                   hovertemplate="%{source.label} → %{target.label}"
                                 "<br>%{value:,.0f} km²<extra></extra>"),
     ))
+    # A 10px margin leaves Plotly no room to place node labels outside the
+    # diagram, so it falls back to drawing them inward, directly over the
+    # (often dark-saturated) flow bands -- illegible for any label that lands
+    # on a similarly dark colour. 130px on each side is enough for the
+    # longest label ("Bare / sparse 2003") to sit fully in the margin, on the
+    # plain page background, at this font size.
     fig.update_layout(
         title=f"Land converted between {year_from} and {year_to} "
               f"(persistence excluded)",
-        height=460, margin=dict(l=10, r=10, t=50, b=10),
-        paper_bgcolor=PLOT_BG, font=dict(size=12))
+        height=460, margin=dict(l=130, r=130, t=50, b=10),
+        paper_bgcolor=PLOT_BG,
+        font=dict(size=12, color="#243e36"))
     return fig
 
 
