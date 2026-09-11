@@ -5,5 +5,14 @@
 gatherUsageStats = false
 
 [theme]
+# Brand tokens carried over from moosarazauaf.github.io/assets/css/variables.css
+# (forest / sage / gold, phi-based). Keeps the two sites reading as one system.
 base = "light"
-primaryColor = "#1d7a3e"
+primaryColor = "#2f5546"
+backgroundColor = "#f1f7ed"
+secondaryBackgroundColor = "#e8f2dc"
+textColor = "#243e36"
+# Body stays sans (Streamlit default), matching --font-body on the portfolio.
+# Headings get Georgia via CSS below, matching --font-heading -- a single
+# global "serif" here would also hit numbers and tables, which the portfolio
+# never does.

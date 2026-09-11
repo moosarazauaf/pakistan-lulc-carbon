@@ -28,13 +28,48 @@ st.set_page_config(page_title="Pakistan LULC and Carbon 1993-2023",
                    page_icon="🌍", layout="wide",
                    initial_sidebar_state="expanded")
 
+# Same brand tokens as moosarazauaf.github.io/assets/css/variables.css --
+# forest/sage/gold on the phi (1.618) scale, so the two sites read as one
+# system rather than a data app bolted onto a portfolio. Only h1-h3 switch to
+# the portfolio's Georgia heading face; body and numbers stay sans (the
+# portfolio never sets numerals in serif either -- see the comment in
+# .streamlit/config.toml).
 CSS = """
 <style>
-  .block-container {padding-top: 2.2rem; padding-bottom: 3rem;}
-  [data-testid="stMetricValue"] {font-size: 1.55rem;}
+  :root {
+    --phi: 1.618;
+    --forest: #243e36;
+    --forest-deep: #16261f;
+    --sage: #7ca982;
+    --gold-readable: #8a7420;
+    --paper: #f1f7ed;
+  }
+  .block-container {padding-top: 2.618rem; padding-bottom: 4.236rem;}
+  h1, h2, h3 {
+    font-family: Georgia, "Times New Roman", serif;
+    color: var(--forest-deep);
+    letter-spacing: -0.01em;
+  }
+  [data-testid="stMetricValue"] {font-size: 1.618rem; color: var(--forest-deep);}
   [data-testid="stMetricLabel"] {opacity: .78;}
+  [data-testid="stMetricDelta"] svg {color: var(--gold-readable) !important;}
   h3 {margin-top: .4rem;}
   .lead {font-size: 1.02rem; opacity: .85; max-width: 70ch; line-height: 1.55;}
+  a {color: var(--forest);}
+  a:hover {color: var(--gold-readable);}
+  [data-testid="stTabs"] button[aria-selected="true"] {
+    color: var(--forest-deep);
+    border-bottom-color: var(--gold-readable) !important;
+  }
+  .site-credit {
+    margin-top: 4.236rem;
+    padding-top: 1.618rem;
+    border-top: 1px solid #d7e6c8;
+    font-size: 0.875rem;
+    opacity: .82;
+    line-height: 1.618;
+  }
+  .site-credit a {font-weight: 600;}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -330,6 +365,23 @@ def main() -> None:
         views.render_districts(y0, y1)
     with tabs[5]:
         method_tab()
+
+    st.markdown(
+        """
+        <div class="site-credit">
+          Built by <a href="https://moosarazauaf.github.io" target="_blank"
+          rel="noopener">Muhammad Moosa Raza</a> — remote sensing &amp;
+          environmental research. This national app is a companion to the
+          district-level <a href="https://moosarazauaf.github.io/#projects"
+          target="_blank" rel="noopener">Lahore land-cover and carbon
+          projection</a> on the portfolio site, where both are documented
+          side by side. Source on
+          <a href="https://github.com/moosarazauaf/pakistan-lulc-carbon"
+          target="_blank" rel="noopener">GitHub</a>.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 if __name__ == "__main__":
