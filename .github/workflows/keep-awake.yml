@@ -1,0 +1,47 @@
+name: Keep the app awake
+
+# Streamlit Community Cloud hibernates any app with no traffic for 12 hours, and
+# the free tier has no setting to turn that off. Waking costs a visitor 30 to 60
+# seconds staring at a "this app has gone to sleep" page, which is not what a
+# portfolio link should do.
+#
+# Every 4 hours gives six visits a day against a 12-hour budget, so the app stays
+# up even if GitHub delays or drops two consecutive runs. Scheduled workflows are
+# routinely late by tens of minutes under load, which is why the interval is not
+# set closer to the limit.
+
+on:
+  schedule:
+    - cron: "0 */4 * * *"
+  workflow_dispatch:
+
+# Never let two runs overlap, and drop a queued run rather than piling up if one
+# is slow.
+concurrency:
+  group: keep-awake
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  visit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Playwright with Chromium
+        run: |
+          python -m pip install --quiet --upgrade pip
+          python -m pip install --quiet playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Visit the app
+        env:
+          APP_URL: https://gee-lulc-pakistan.streamlit.app/
+        run: python scripts/keep_awake.py
