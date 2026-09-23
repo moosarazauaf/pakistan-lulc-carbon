@@ -13,6 +13,15 @@ Driving a headless browser does both jobs: it opens a genuine session, and if it
 lands on the hibernation page it clicks the wake button and waits for the app to
 come back.
 
+Why every check walks the frames
+--------------------------------
+On *.streamlit.app the app is served inside a cross-origin iframe, and the
+top-level document body is empty. Checking `document.body.innerText` therefore
+reports nothing regardless of whether the app is healthy, asleep or broken, so
+every text check here iterates page.frames instead. Playwright drives the
+browser itself, so it can read across the origin boundary that a page script
+could not.
+
 It doubles as an uptime check. The script exits non-zero if the app never
 renders, so a failed scheduled run is a real alert rather than a silent no-op.
 """
@@ -20,8 +29,9 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import Page, sync_playwright
 
 APP_URL = os.environ.get("APP_URL", "https://gee-lulc-pakistan.streamlit.app/")
 
@@ -34,47 +44,68 @@ READY_TEXT = "Pakistan land cover and carbon"
 # match loosely on the distinctive part rather than the whole sentence.
 WAKE_PATTERN = "get this app back up"
 
-TIMEOUT_MS = 120_000
+READY_TIMEOUT_S = 180
+WAKE_LOOK_S = 20
+
+
+def _all_text(page: Page) -> str:
+    """Visible text across every frame, including the cross-origin app iframe."""
+    chunks = []
+    for frame in page.frames:
+        try:
+            chunks.append(frame.locator("body").inner_text(timeout=2_000))
+        except Exception:  # noqa: BLE001
+            continue  # a frame can detach mid-poll; it is not an error
+    return "\n".join(chunks)
+
+
+def _wait_for_text(page: Page, needle: str, seconds: int) -> bool:
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        if needle.lower() in _all_text(page).lower():
+            return True
+        page.wait_for_timeout(2_000)
+    return False
+
+
+def _click_wake(page: Page) -> bool:
+    for frame in page.frames:
+        try:
+            button = frame.get_by_text(WAKE_PATTERN, exact=False).first
+            button.wait_for(state="visible", timeout=2_000)
+            button.click()
+            return True
+        except Exception:  # noqa: BLE001
+            continue
+    return False
 
 
 def main() -> int:
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page(viewport={"width": 1280, "height": 900})
-        print(f"visiting {APP_URL}")
-        page.goto(APP_URL, wait_until="domcontentloaded", timeout=TIMEOUT_MS)
+        print(f"visiting {APP_URL}", flush=True)
+        page.goto(APP_URL, wait_until="domcontentloaded", timeout=120_000)
 
-        # If it hibernated, wake it. Give this a short window: on a healthy app
-        # the button is simply absent and we should not wait out the timeout.
-        try:
-            wake = page.get_by_text(WAKE_PATTERN, exact=False).first
-            wake.wait_for(state="visible", timeout=15_000)
-            print("app was asleep, clicking the wake button")
-            wake.click()
-        except Exception:
-            print("no hibernation page, app was already up")
+        if _wait_for_text(page, WAKE_PATTERN, WAKE_LOOK_S):
+            print("app was asleep, clicking the wake button", flush=True)
+            if not _click_wake(page):
+                print("could not click the wake button", flush=True)
+        else:
+            print("no hibernation page, app was already up", flush=True)
 
-        try:
-            page.wait_for_function(
-                "text => document.body.innerText.includes(text)",
-                arg=READY_TEXT,
-                timeout=TIMEOUT_MS,
-            )
-        except Exception:
-            body = ""
-            try:
-                body = page.inner_text("body")[:600]
-            except Exception:  # noqa: BLE001
-                pass
-            print(f"FAILED: app did not render within {TIMEOUT_MS // 1000}s")
-            print(f"page text was:\n{body}")
+        if not _wait_for_text(page, READY_TEXT, READY_TIMEOUT_S):
+            print(f"FAILED: app did not render within {READY_TIMEOUT_S}s",
+                  flush=True)
+            print(f"frames seen: {[f.url[:80] for f in page.frames]}", flush=True)
+            print(f"text across frames:\n{_all_text(page)[:800]}", flush=True)
             browser.close()
             return 1
 
-        # A session that closes immediately may not register as traffic, so hold
-        # it open briefly.
+        # A session that closes the instant it renders may not register as
+        # traffic, so hold it open briefly.
         page.wait_for_timeout(5_000)
-        print("app is awake and rendered")
+        print("app is awake and rendered", flush=True)
         browser.close()
         return 0
 
