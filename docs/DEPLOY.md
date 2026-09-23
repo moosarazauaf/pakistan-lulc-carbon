@@ -102,6 +102,50 @@ Rebuilding them takes roughly an hour of Earth Engine time
   deployment that drops it is misleading.
 - Map tab renders tiles once the secret is set.
 
+## Keeping it awake
+
+Streamlit Community Cloud hibernates any app with **no traffic for 12 hours**,
+and the free tier has no setting to turn that off. A visitor arriving at a
+sleeping app waits 30 to 60 seconds on a "this app has gone to sleep" page. The
+window used to be 7 days, then 72 hours; it is now 12.
+
+Two scheduled workflows handle this.
+
+`.github/workflows/keep-awake.yml` visits the app every 4 hours. That is six
+visits a day against a 12-hour budget, so it survives GitHub delaying or
+dropping two consecutive runs, which scheduled workflows do under load.
+
+It drives a headless browser rather than curling the URL, for two reasons. What
+resets the timer is the websocket session the front end opens, not the initial
+HTTP GET. And against an already-sleeping app a GET just fetches the hibernation
+page without waking anything — the browser clicks the wake button.
+
+Every check walks `page.frames`, because on `*.streamlit.app` the app is served
+inside a cross-origin iframe and the top-level `document.body.innerText` is
+empty whether the app is healthy, asleep or broken. The first version of this
+script checked the top frame and failed for exactly that reason.
+
+The script exits non-zero if the app never renders, so it doubles as an uptime
+check: a failed scheduled run is a real alert, not a silent no-op.
+
+`.github/workflows/keep-schedule-alive.yml` pushes one empty commit a month.
+GitHub disables scheduled workflows in a public repository after 60 days with no
+repository activity, a disabled workflow cannot re-enable itself, and the
+auto-disable hits every scheduled workflow at once — so without this the
+keep-awake schedule would quietly die during any quiet stretch.
+
+To check on them:
+
+```bash
+gh run list --workflow=keep-awake.yml --limit 5
+gh workflow run keep-awake.yml          # force a visit now
+```
+
+If the app ever needs to be truly always-on with no cold start at all, the
+options are a paid host with one instance kept warm (Fly.io, Cloud Run), or
+rebuilding as a static site — every number already comes from the committed
+cache, so only the live Earth Engine map depends on a running server.
+
 ## Cost and quota
 
 The free tier is enough; the app does no heavy computation at request time.
